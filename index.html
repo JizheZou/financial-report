@@ -21,6 +21,37 @@
     #pdfContent.pdf-mode .no-pdf { display: none !important; }
     #pdfContent.pdf-mode { background: white; color: #212529; }
     #pdfContent.pdf-mode .expense-item { border-color: #dee2e6 !important; }
+    /* 手机和电脑均使用系统打印引擎导出 PDF，避免 html2pdf 的空白截图问题。 */
+    @media print {
+      @page { size: A4; margin: 12mm; }
+      html, body { background: #fff !important; color: #000 !important; }
+      body, main.container-fluid { margin: 0 !important; padding: 0 !important; }
+      main > h3, main > p,
+      main > .row > section:first-child,
+      main > .row > section:last-child .card-header,
+      main > .row > section:last-child .card-body > .row,
+      #saveStatus, .no-pdf { display: none !important; }
+      main > .row { display: block !important; margin: 0 !important; }
+      main > .row > section:last-child {
+        display: block !important; width: 100% !important; max-width: 100% !important;
+        margin: 0 !important; padding: 0 !important;
+      }
+      main > .row > section:last-child .card,
+      main > .row > section:last-child .card-body {
+        border: 0 !important; box-shadow: none !important;
+        margin: 0 !important; padding: 0 !important;
+      }
+      #pdfContent { background: #fff !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
+      #pdfContent .expense-item { break-inside: auto; page-break-inside: auto; }
+      #pdfContent .expense-thumb {
+        display: block !important; width: auto !important; height: auto !important;
+        max-width: 100% !important; max-height: 190mm !important;
+        object-fit: contain !important; break-inside: avoid; page-break-inside: avoid;
+        margin-bottom: 4mm !important;
+      }
+      #pdfContent .d-flex.flex-wrap { display: block !important; }
+      #pdfContent h5 { break-inside: avoid; }
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -37,9 +68,7 @@
               <div class="mb-3">
                 <label for="category" class="form-label">
                   报账类别
-                  <small class = "test-muted">
-                    ⬇这里选报账的类别, 你也没说都有什么, 想加来求我
-                  </small> 
+                  <small class="text-muted">⬇这里选报账的类别, 你也没说都有什么, 想加来求我</small>
                 </label>
                 <select id="category" class="form-select" required>
                   <option value="" selected disabled>请选择类别</option>
@@ -53,9 +82,7 @@
               <div class="mb-3">
                 <label for="amount" class="form-label">
                   报账金额（人民币）
-                  <small class = "text-muted">
-                    ⬇这里写多少钱
-                  </small>
+                  <small class="text-muted">⬇这里写多少钱</small>
                 </label>
                 <div class="input-group">
                   <span class="input-group-text">¥</span>
@@ -65,9 +92,7 @@
               <div class="mb-3">
                 <label for="remark" class="form-label">
                   备注
-                  <small class = "text-muted">
-                    ⬇这里写啥账, 数量什么的, 或者员工工资给谁开的工资等等
-                  </small>
+                  <small class="text-muted">⬇这里写啥账, 数量什么的, 或者员工工资给谁开的工资等等</small>
                 </label>
                 <textarea id="remark" class="form-control" rows="3" placeholder="可以填写报账说明"></textarea>
               </div>
@@ -75,10 +100,8 @@
                 <label for="images" class="form-label">上传凭证图片</label>
                 <input type="file" id="images" class="form-control" accept="image/*" multiple>
                 <div class="form-text">
-                  ⬆点这个传照片, 可以一次传多张, 
-                  别整太大哈, 怕你内存受不了, 
+                  ⬆点这个传照片, 可以一次传多张, 别整太大哈, 怕你内存受不了,
                   最好一张不超过 15 MB。传完了点下面添加就到右边了
-
                 </div>
                 <div id="selectedImagesInfo" class="small text-secondary mt-2">本条记录尚未选择图片</div>
                 <div id="selectedImagesPreview" class="d-flex flex-wrap gap-2 mt-2" aria-live="polite"></div>
@@ -104,21 +127,12 @@
             </div>
             <div class="row g-2 mt-3">
               <div class="col-12 col-sm-6">
-                <button id="generatePdfBtn" type="button" class="btn btn-success btn-lg w-100" disabled>
-                  生成 PDF
-                  
-                </button>
-                <small class = "text-muted">
-                    ⬆传完了点这个, 会生成一个pdf文件, 然后给他们扔群里就行了
-                  </small>
+                <button id="generatePdfBtn" type="button" class="btn btn-success btn-lg w-100" disabled>打印 / 保存 PDF</button>
+                <small class="text-muted">⬆点击后在打印界面选择「保存为 PDF」；iPhone 可从打印预览分享并保存到「文件」。</small>
               </div>
               <div class="col-12 col-sm-6">
-                <button id="clearBtn" type="button" class="btn btn-outline-danger btn-lg w-100" disabled>
-                  清空报账单
-                </button>
-                <small class = "text-muted">
-                    ⬆这个别瞎他妈点, 点完全没了,还得重新传, 等你传报表或者想重新生成一张再点, 清一下缓存
-                </small>
+                <button id="clearBtn" type="button" class="btn btn-outline-danger btn-lg w-100" disabled>清空报账单</button>
+                <small class="text-muted">⬆这个别瞎他妈点, 点完全没了,还得重新传, 等你传报表或者想重新生成一张再点, 清一下缓存</small>
               </div>
             </div>
             <p id="saveStatus" class="small text-secondary mt-3 mb-0" role="status" aria-live="polite">正在加载草稿...</p>
@@ -128,7 +142,6 @@
     </div>
   </main>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script>
     "use strict";
 
@@ -299,74 +312,95 @@
       return files.map(file => URL.createObjectURL(file));
     }
 
-    function renderExpenses() {
-      expenseList.replaceChildren();
-      let totalCents = 0;
-      if (expenses.length === 0) {
+    // 只创建新记录的节点，删除记录时不重建其他图片。
+    // 旧实现 replaceChildren() 会重新加载所有 blob: 图片地址，
+    // 在部分手机浏览器中可能导致其他图片显示成问号。
+    function createExpenseElement(expense) {
+      const item = document.createElement("div");
+      item.className = "expense-item border rounded p-3 mb-3";
+      item.dataset.expenseId = String(expense.id);
+
+      const header = document.createElement("div");
+      header.className = "d-flex justify-content-between align-items-center gap-2";
+      const category = document.createElement("strong");
+      category.textContent = expense.category;
+      const amount = document.createElement("strong");
+      amount.textContent = formatMoney(expense.amount);
+      header.append(category, amount);
+      item.appendChild(header);
+
+      if (expense.remark) {
+        const remark = document.createElement("p");
+        remark.className = "text-secondary mt-2 mb-2";
+        remark.style.whiteSpace = "pre-wrap";
+        remark.textContent = expense.remark;
+        item.appendChild(remark);
+      }
+
+      if (expense.imageUrls.length) {
+        const photos = document.createElement("div");
+        photos.className = "d-flex flex-wrap gap-2 mt-2";
+        for (const url of expense.imageUrls) {
+          const img = document.createElement("img");
+          img.className = "img-thumbnail expense-thumb";
+          img.alt = "凭证照片";
+          img.src = url;
+          photos.appendChild(img);
+        }
+        item.appendChild(photos);
+      }
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "btn btn-outline-danger btn-sm mt-3 no-pdf";
+      deleteBtn.textContent = "删除";
+      deleteBtn.addEventListener("click", async () => {
+        if (isClearing) return;
+        const position = expenses.findIndex(e => e.id === expense.id);
+        if (position === -1) return;
+        expenses.splice(position, 1);
+        item.remove(); // 只删除这一条，其他记录和图片节点保持不变
+        updateSummary();
+        expense.imageUrls.forEach(url => URL.revokeObjectURL(url));
+        try {
+          await saveDraft();
+          updateSaveStatus("草稿已自动保存到当前浏览器");
+        } catch (error) {
+          console.error("删除后保存失败：", error);
+          updateSaveStatus("保存失败：当前修改可能在刷新后丢失", true);
+        }
+      });
+      item.appendChild(deleteBtn);
+      return item;
+    }
+
+    function updateSummary() {
+      const totalCents = expenses.reduce((sum, expense) =>
+        sum + Math.round((Number(expense.amount) || 0) * 100), 0);
+      totalAmount.textContent = formatMoney(totalCents / 100);
+      generatePdfBtn.disabled = expenses.length === 0;
+      if (expenses.length === 0 && !expenseList.querySelector(".empty-message")) {
         const empty = document.createElement("p");
-        empty.className = "text-muted";
+        empty.className = "text-muted empty-message";
         empty.textContent = "暂无报账记录";
         expenseList.appendChild(empty);
       }
+    }
 
+    // 页面初始恢复草稿以及清空时调用。
+    function renderExpenses() {
+      expenseList.replaceChildren();
       for (const expense of expenses) {
-        totalCents += Math.round((Number(expense.amount) || 0) * 100);
-        const item = document.createElement("div");
-        item.className = "expense-item border rounded p-3 mb-3";
-
-        const header = document.createElement("div");
-        header.className = "d-flex justify-content-between align-items-center gap-2";
-        const category = document.createElement("strong");
-        category.textContent = expense.category;
-        const amount = document.createElement("strong");
-        amount.textContent = formatMoney(expense.amount);
-        header.append(category, amount);
-        item.appendChild(header);
-
-        if (expense.remark) {
-          const remark = document.createElement("p");
-          remark.className = "text-secondary mt-2 mb-2";
-          remark.style.whiteSpace = "pre-wrap";
-          remark.textContent = expense.remark;
-          item.appendChild(remark);
-        }
-
-        if (expense.imageUrls.length) {
-          const photos = document.createElement("div");
-          photos.className = "d-flex flex-wrap gap-2 mt-2";
-          for (const url of expense.imageUrls) {
-            const img = document.createElement("img");
-            img.className = "img-thumbnail expense-thumb";
-            img.alt = "凭证照片";
-            img.src = url;
-            photos.appendChild(img);
-          }
-          item.appendChild(photos);
-        }
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "btn btn-outline-danger btn-sm mt-3 no-pdf";
-        deleteBtn.textContent = "删除";
-        deleteBtn.addEventListener("click", async () => {
-          if (isClearing) return;
-          // 删除后同步 IndexedDB，且释放已删除图片的临时预览地址。
-          expenses = expenses.filter(e => e.id !== expense.id);
-          expense.imageUrls.forEach(url => URL.revokeObjectURL(url));
-          renderExpenses();
-          try {
-            await saveDraft();
-            updateSaveStatus("草稿已自动保存到当前浏览器");
-          } catch (error) {
-            console.error("删除后保存失败：", error);
-            updateSaveStatus("保存失败：当前修改可能在刷新后丢失", true);
-          }
-        });
-        item.appendChild(deleteBtn);
-        expenseList.appendChild(item);
+        expenseList.appendChild(createExpenseElement(expense));
       }
-      totalAmount.textContent = formatMoney(totalCents / 100);
-      generatePdfBtn.disabled = expenses.length === 0;
+      updateSummary();
+    }
+
+    // 添加新记录时，只新增一张卡片，不重新渲染其他照片。
+    function appendExpense(expense) {
+      expenseList.querySelector(".empty-message")?.remove();
+      expenseList.appendChild(createExpenseElement(expense));
+      updateSummary();
     }
 
     async function restoreDraft() {
@@ -419,7 +453,7 @@
         imageUrls: makePreviewUrls(files)
       };
       expenses.push(expense);
-      renderExpenses();
+      appendExpense(expense);
       clearSelectedImages();
       form.reset();
       addBtn.disabled = true;
@@ -436,48 +470,18 @@
       }
     });
 
-    generatePdfBtn.addEventListener("click", async () => {
-      if (isClearing) return;
-      if (!expenses.length) {
-        alert("请先添加报账记录");
-        return;
-      }
-      if (typeof html2pdf !== "function") {
-        alert("PDF 库未加载，请检查网络或脚本引用");
-        return;
-      }
-      generatePdfBtn.disabled = true;
-      clearBtn.disabled = true; // 导出过程中不允许清空，避免 PDF 内容变化
-      generatePdfBtn.textContent = "正在生成 PDF...";
-      pdfContent.classList.add("pdf-mode");
-      try {
-        // 等待所有照片被浏览器解码，再进行截图式 PDF 导出。
-        await Promise.all(Array.from(pdfContent.querySelectorAll("img"))
-          .map(img => img.decode().catch(() => undefined)));
-        await html2pdf().set({
-          margin: 10,
-          filename: "报账单.pdf",
-          image: { type: "jpeg", quality: 0.95 },
-          html2canvas: { scale: 1.5, backgroundColor: "#ffffff", useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"], avoid: [".expense-item"] }
-        }).from(pdfContent).save();
-      } catch (error) {
-        console.error("PDF 生成失败：", error);
-        alert("PDF 生成失败。可以尝试减少图片数量，或改用 JPG/PNG 图片。");
-      } finally {
-        pdfContent.classList.remove("pdf-mode");
-        generatePdfBtn.textContent = "生成 PDF";
-        generatePdfBtn.disabled = expenses.length === 0;
-        clearBtn.disabled = false;
-      }
+    // 直接调用浏览器的打印功能：不再使用 html2pdf.js 截图式转换。
+    // 手机上的“打印 / 保存 PDF”由操作系统提供，支持多页、中文与图片。
+    generatePdfBtn.addEventListener("click", () => {
+      if (isClearing || expenses.length === 0) return;
+      window.print();
     });
 
     // 清空所有已添加记录及其照片，并同步清除 IndexedDB 当前草稿。
     clearBtn.addEventListener("click", async () => {
       if (isClearing) return;
       const confirmed = window.confirm(
-        "你确定吗？删完可啥都没了 \n你可看好了啊。别傻吧啦叽的! 你PDF生成了吗?"
+        "确定清空当前报账单吗？\n所有已添加记录及照片都会从浏览器草稿中删除，无法撤销。建议先生成 PDF。"
       );
       if (!confirmed) return;
 
