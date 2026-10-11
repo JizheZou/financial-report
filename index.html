@@ -186,11 +186,12 @@
       <div class="fw-bold mb-1">生成并保存报账单 PDF</div>
       <div id="previewStatus" class="small text-secondary mb-2" role="status" aria-live="polite">正在准备文件...</div>
       <div class="d-flex flex-wrap gap-2">
-        <button id="confirmPrintBtn" class="btn btn-success" type="button" disabled>保存 / 分享 PDF</button>
+        <a id="downloadPdfLink" class="btn btn-success d-none" download="崔莹报账单.pdf">下载 PDF</a>
+        <button id="sharePdfBtn" class="btn btn-outline-success" type="button" disabled>分享到手机</button>
         <a id="openPdfLink" class="btn btn-outline-primary d-none" target="_blank" rel="noopener noreferrer">打开 PDF 查看</a>
         <button id="closePreviewBtn" class="btn btn-outline-secondary" type="button">返回编辑</button>
       </div>
-      <div class="small text-secondary mt-2">iPhone：点「保存 / 分享 PDF」，在系统共享菜单中选「存储到文件」。如果没有弹出共享菜单，可点「打开 PDF 查看」。</div>
+      <div class="small text-secondary mt-2">iPhone 推荐：在 Safari 点「打开 PDF 查看」，打开后点 Safari 的分享图标（方框↑）→「存储到文件」。Android / Windows 可以先点「下载 PDF」。如果在微信等 App 内置浏览器中打开，请改用 Safari 或 Chrome。</div>
     </div>
     <div class="print-sheet" style="min-height: 100px;"><div id="printDocument" class="print-document"></div></div>
   </div>
@@ -213,7 +214,8 @@
     const exportPreview = document.getElementById("exportPreview");
     const previewStatus = document.getElementById("previewStatus");
     const printDocument = document.getElementById("printDocument");
-    const confirmPrintBtn = document.getElementById("confirmPrintBtn");
+    const sharePdfBtn = document.getElementById("sharePdfBtn");
+    const downloadPdfLink = document.getElementById("downloadPdfLink");
     const closePreviewBtn = document.getElementById("closePreviewBtn");
     const openPdfLink = document.getElementById("openPdfLink");
     let readyPdfUrl = null;
@@ -887,8 +889,9 @@ generatePdfBtn.addEventListener("click", async () => {
   previewStatus.classList.remove("text-danger");
   previewStatus.textContent = "正在生成 PDF，请勿关闭这个页面…";
   printDocument.replaceChildren();
-  confirmPrintBtn.disabled = true;
+  sharePdfBtn.disabled = true;
   closePreviewBtn.disabled = true;
+  downloadPdfLink.classList.add("d-none");
   openPdfLink.classList.add("d-none");
   try {
     const {bytes, pages} = await createDirectPdf();
@@ -897,9 +900,12 @@ generatePdfBtn.addEventListener("click", async () => {
     readyPdfUrl = URL.createObjectURL(blob);
     readyPdfFile = new File([blob], "崔莹报账单.pdf", {type: "application/pdf"});
     openPdfLink.href = readyPdfUrl;
+    downloadPdfLink.href = readyPdfUrl;
+    downloadPdfLink.download = readyPdfFile.name;
     openPdfLink.classList.remove("d-none");
-    confirmPrintBtn.disabled = false;
-    previewStatus.textContent = `PDF 已成功生成（共 ${pages} 页），请点击「保存 / 分享 PDF」。`;
+    downloadPdfLink.classList.remove("d-none");
+    sharePdfBtn.disabled = false;
+    previewStatus.textContent = `PDF 已成功生成（共 ${pages} 页）。请选择「下载 PDF」或「打开 PDF 查看」。`;
     printDocument.appendChild(printNode("p", "mt-4 text-center", `已生成 ${expenses.length} 条报账记录，合计 ${formatMoney(expenses.reduce((t,e)=>t+Math.round(Number(e.amount)*100),0)/100)}。`));
   } catch (error) {
     console.error("生成 PDF 失败：", error);
@@ -910,25 +916,42 @@ generatePdfBtn.addEventListener("click", async () => {
   }
 });
 
-confirmPrintBtn.addEventListener("click", () => {
-  if (confirmPrintBtn.disabled || !readyPdfUrl || !readyPdfFile) return;
-  const data = {files: [readyPdfFile], title: "崔莹报账单"};
-  if (navigator.share && navigator.canShare && navigator.canShare({files: data.files})) {
-    // 直接在点击事件中调用，不先 await 任何异步任务。
-    navigator.share(data).catch(error => {
-      if (error.name !== "AbortError") {
-        previewStatus.textContent = "分享未打开：可点击旁边的「打开 PDF 查看」，再从浏览器保存。";
-      }
-    });
-  } else {
-    const a = document.createElement("a");
-    a.href = readyPdfUrl;
-    a.download = readyPdfFile.name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    previewStatus.textContent = "已发起 PDF 下载。如果手机没有下载提示，可点击「打开 PDF 查看」。";
+// 下载是普通 <a download> 链接：直接响应用户点击，而不是 JavaScript 模拟点击。
+downloadPdfLink.addEventListener("click", (event) => {
+  if (!readyPdfUrl) { event.preventDefault(); return; }
+  previewStatus.textContent = "已请求浏览器下载 PDF。若手机没有反应，请点「打开 PDF 查看」，再通过浏览器分享菜单存储到文件。";
+});
+
+// 分享与下载分开，任何 API 失败都提供可见提示，避免用户点击后没有反馈。
+sharePdfBtn.addEventListener("click", () => {
+  if (!readyPdfFile) {
+    previewStatus.textContent = "文件尚未生成，请先返回编辑并点击「生成 PDF」。";
+    return;
   }
+  let supported = false;
+  try {
+    supported = typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({files: [readyPdfFile]});
+  } catch (error) {
+    console.warn("无法检测文件分享支持：", error);
+  }
+  if (!supported) {
+    previewStatus.textContent = "当前浏览器不支持直接分享 PDF。请用「打开 PDF 查看」→ 浏览器分享图标 → 存储到文件；或点击「下载 PDF」。";
+    return;
+  }
+  // navigator.share 必须在真实点击时同步调用，以保留用户激活权限。
+  previewStatus.textContent = "正在请求系统分享菜单…如果没有弹出，请改用「打开 PDF 查看」。";
+  navigator.share({files: [readyPdfFile], title: "崔莹报账单"})
+    .then(() => {
+      previewStatus.textContent = "系统分享操作已结束。请确认文件是否保存成功。";
+    })
+    .catch(error => {
+      console.warn("PDF 分享失败：", error);
+      previewStatus.textContent = error && error.name === "AbortError"
+        ? "分享已取消，或设备没有可用的分享目标。可以点「打开 PDF 查看」，再从 Safari 分享菜单保存。"
+        : `系统分享失败（${error?.name || "未知原因"}）。请点「打开 PDF 查看」，从浏览器保存。`;
+    });
 });
 
 closePreviewBtn.addEventListener("click", () => {
