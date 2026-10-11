@@ -21,36 +21,74 @@
     #pdfContent.pdf-mode .no-pdf { display: none !important; }
     #pdfContent.pdf-mode { background: white; color: #212529; }
     #pdfContent.pdf-mode .expense-item { border-color: #dee2e6 !important; }
-    /* 手机和电脑均使用系统打印引擎导出 PDF，避免 html2pdf 的空白截图问题。 */
+    /* 导出预览独立于 Bootstrap 卡片，不把网页布局直接打印到 PDF。 */
+    #exportPreview[hidden] { display: none !important; }
+    .export-overlay {
+      position: fixed; inset: 0; z-index: 10000; overflow-y: auto;
+      background: #e9edf2; padding: 12px 10px 28px;
+    }
+    .preview-open { overflow: hidden; }
+    .export-toolbar {
+      position: sticky; top: 0; z-index: 1; max-width: 210mm;
+      margin: 0 auto 12px; padding: 12px; background: white;
+      box-shadow: 0 2px 10px #0002; border-radius: 8px;
+    }
+    .print-sheet {
+      box-sizing: border-box; max-width: 210mm; min-height: 297mm;
+      margin: auto; padding: 14mm; background: white;
+      box-shadow: 0 3px 18px #0002;
+    }
+    .print-document { color: #222; font-family: -apple-system, BlinkMacSystemFont,
+      "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      font-size: 11pt; line-height: 1.55; overflow-wrap: anywhere; }
+    .print-document * { box-sizing: border-box; }
+    .print-heading { text-align: center; font-size: 20pt; margin: 0 0 2mm; font-weight: 700; }
+    .print-date { text-align: right; font-size: 9pt; color: #555; margin-bottom: 6mm; }
+    .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 8mm; }
+    .print-table th, .print-table td { border: 1px solid #bfc7cf; padding: 2.5mm 3mm; vertical-align: top; }
+    .print-table th { background: #f2f5f8; font-weight: 700; }
+    .print-table .money { text-align: right; width: 28%; white-space: nowrap; }
+    .print-table .number { width: 13%; text-align: center; }
+    .print-table .total-row { font-weight: 700; background: #f7f8fa; }
+    .print-section-title { font-size: 13pt; font-weight: 700; margin: 3mm 0; padding-bottom: 2mm; border-bottom: 1px solid #bbb; }
+    .print-entry { margin: 0 0 7mm; }
+    .print-entry-heading {
+      display: flex; justify-content: space-between; gap: 3mm;
+      background: #f2f5f8; padding: 2mm 3mm; font-weight: 700;
+      break-after: avoid; page-break-after: avoid;
+    }
+    .print-remark { white-space: pre-wrap; margin: 2mm 3mm 3mm; overflow-wrap: anywhere; }
+    .print-photo { margin: 3mm 0 5mm; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+    .print-photo img {
+      display: block; width: auto; height: auto; max-width: 100%;
+      max-height: 135mm; object-fit: contain; margin: 0 auto;
+      border: 1px solid #d9d9d9;
+    }
+    .print-photo figcaption { color: #666; font-size: 9pt; margin-top: 1.5mm; }
+    @media (max-width: 600px) {
+      .print-sheet { padding: 5mm; min-height: auto; }
+      .print-document { font-size: 10pt; }
+      .print-heading { font-size: 17pt; }
+    }
     @media print {
-      @page { size: A4; margin: 12mm; }
-      html, body { background: #fff !important; color: #000 !important; }
-      body, main.container-fluid { margin: 0 !important; padding: 0 !important; }
-      main > h3, main > p,
-      main > .row > section:first-child,
-      main > .row > section:last-child .card-header,
-      main > .row > section:last-child .card-body > .row,
-      #saveStatus, .no-pdf { display: none !important; }
-      main > .row { display: block !important; margin: 0 !important; }
-      main > .row > section:last-child {
-        display: block !important; width: 100% !important; max-width: 100% !important;
-        margin: 0 !important; padding: 0 !important;
+      @page { size: A4; margin: 13mm; }
+      html, body { margin: 0 !important; padding: 0 !important;
+        background: white !important; overflow: visible !important; }
+      body > main { display: none !important; }
+      #exportPreview { display: block !important; position: static !important;
+        inset: auto !important; overflow: visible !important; padding: 0 !important;
+        margin: 0 !important; background: white !important; }
+      .export-toolbar { display: none !important; }
+      .print-sheet { max-width: none !important; min-height: auto !important;
+        padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
+      .print-document { font-size: 10.5pt !important; }
+      .print-table thead { display: table-header-group; }
+      .print-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .print-heading, .print-section-title { break-after: avoid; page-break-after: avoid; }
+      .print-photo img { max-height: 135mm !important; }
+      .print-entry-heading, .print-table th, .print-table .total-row {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
       }
-      main > .row > section:last-child .card,
-      main > .row > section:last-child .card-body {
-        border: 0 !important; box-shadow: none !important;
-        margin: 0 !important; padding: 0 !important;
-      }
-      #pdfContent { background: #fff !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
-      #pdfContent .expense-item { break-inside: auto; page-break-inside: auto; }
-      #pdfContent .expense-thumb {
-        display: block !important; width: auto !important; height: auto !important;
-        max-width: 100% !important; max-height: 190mm !important;
-        object-fit: contain !important; break-inside: avoid; page-break-inside: avoid;
-        margin-bottom: 4mm !important;
-      }
-      #pdfContent .d-flex.flex-wrap { display: block !important; }
-      #pdfContent h5 { break-inside: avoid; }
     }
   </style>
 </head>
@@ -127,8 +165,8 @@
             </div>
             <div class="row g-2 mt-3">
               <div class="col-12 col-sm-6">
-                <button id="generatePdfBtn" type="button" class="btn btn-success btn-lg w-100" disabled>打印 / 保存 PDF</button>
-                <small class="text-muted">⬆点击后在打印界面选择「保存为 PDF」；iPhone 可从打印预览分享并保存到「文件」。</small>
+                <button id="generatePdfBtn" type="button" class="btn btn-success btn-lg w-100" disabled>生成 PDF</button>
+                <small class="text-muted">⬆先预览 A4 报账单（包含图片），再选择打印或保存为 PDF。</small>
               </div>
               <div class="col-12 col-sm-6">
                 <button id="clearBtn" type="button" class="btn btn-outline-danger btn-lg w-100" disabled>清空报账单</button>
@@ -141,6 +179,20 @@
       </section>
     </div>
   </main>
+
+  <!-- PDF 专用预览：不使用页面右侧的缩略图，不依赖临时 blob: 图片地址。 -->
+  <div id="exportPreview" class="export-overlay" hidden role="dialog" aria-modal="true" aria-label="报账单 PDF 预览">
+    <div class="export-toolbar">
+      <div class="fw-bold mb-1">报账单 PDF 预览</div>
+      <div id="previewStatus" class="small text-secondary mb-2" role="status" aria-live="polite">正在准备图片...</div>
+      <div class="d-flex flex-wrap gap-2">
+        <button id="confirmPrintBtn" class="btn btn-success" type="button" disabled>打印 / 保存 PDF</button>
+        <button id="closePreviewBtn" class="btn btn-outline-secondary" type="button">返回编辑</button>
+      </div>
+      <div class="small text-secondary mt-2">iPhone：点击打印后，在系统预览中分享并存储到「文件」。请先确认下面能看到所有照片。</div>
+    </div>
+    <div class="print-sheet"><div id="printDocument" class="print-document"></div></div>
+  </div>
 
   <script>
     "use strict";
@@ -157,6 +209,11 @@
     const addBtn = document.getElementById("addBtn");
     const generatePdfBtn = document.getElementById("generatePdfBtn");
     const clearBtn = document.getElementById("clearBtn");
+    const exportPreview = document.getElementById("exportPreview");
+    const previewStatus = document.getElementById("previewStatus");
+    const printDocument = document.getElementById("printDocument");
+    const confirmPrintBtn = document.getElementById("confirmPrintBtn");
+    const closePreviewBtn = document.getElementById("closePreviewBtn");
     let isClearing = false;
     // 将 IndexedDB 写操作按先后顺序排队，防止“添加后立即清空”时旧草稿再次写回。
     let lastDraftWrite = Promise.resolve();
@@ -470,11 +527,158 @@
       }
     });
 
-    // 直接调用浏览器的打印功能：不再使用 html2pdf.js 截图式转换。
-    // 手机上的“打印 / 保存 PDF”由操作系统提供，支持多页、中文与图片。
-    generatePdfBtn.addEventListener("click", () => {
+    // 为 PDF 单独生成打印版图片，避免 iPhone 的打印引擎无法读取 blob: 临时地址。
+    // 同时限制最长边为 1600px，减少手机在打印多张大照片时的内存负担。
+    function imageToPrintDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        if (!(file instanceof Blob)) {
+          reject(new Error("草稿中的图片文件无效"));
+          return;
+        }
+        const tempUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+          URL.revokeObjectURL(tempUrl);
+          try {
+            const width = image.naturalWidth;
+            const height = image.naturalHeight;
+            if (!width || !height) throw new Error("无法读取图片尺寸");
+            const factor = Math.min(1, 1600 / Math.max(width, height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(width * factor));
+            canvas.height = Math.max(1, Math.round(height * factor));
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("手机没有足够内存处理图片");
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const result = canvas.toDataURL("image/jpeg", 0.85);
+            canvas.width = 0;
+            canvas.height = 0;
+            resolve(result);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(tempUrl);
+          reject(new Error("无法读取此图片格式"));
+        };
+        image.src = tempUrl;
+      });
+    }
+
+    // 所有动态内容都用 textContent 设置，避免备注里的 HTML 被当作标签执行。
+    function printNode(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    async function buildPrintDocument() {
+      printDocument.replaceChildren();
+      const heading = printNode("h1", "print-heading", "崔莹报账单");
+      const date = printNode("div", "print-date", "生成日期：" + new Date().toLocaleDateString("zh-CN"));
+      printDocument.append(heading, date);
+
+      // 标准费用汇总表：比直接打印 Bootstrap 卡片更适合 A4。
+      const table = printNode("table", "print-table");
+      const thead = table.createTHead();
+      const headerRow = thead.insertRow();
+      for (const [name, cls] of [["序号", "number"], ["报账类别", ""], ["金额", "money"]]) {
+        const th = printNode("th", cls, name);
+        headerRow.appendChild(th);
+      }
+      const tbody = table.createTBody();
+      let cents = 0;
+      for (const [i, expense] of expenses.entries()) {
+        const row = tbody.insertRow();
+        row.append(
+          printNode("td", "number", String(i + 1)),
+          printNode("td", "", expense.category),
+          printNode("td", "money", formatMoney(expense.amount))
+        );
+        cents += Math.round((Number(expense.amount) || 0) * 100);
+      }
+      const totalRow = tbody.insertRow();
+      totalRow.className = "total-row";
+      const totalLabel = printNode("td", "", "总金额");
+      totalLabel.colSpan = 2;
+      totalRow.append(totalLabel, printNode("td", "money", formatMoney(cents / 100)));
+      printDocument.appendChild(table);
+
+      const detailHeading = printNode("h2", "print-section-title", "明细及凭证");
+      printDocument.appendChild(detailHeading);
+
+      let fileCount = 0;
+      for (const expense of expenses) fileCount += (expense.files || []).length;
+      let done = 0;
+      for (const [i, expense] of expenses.entries()) {
+        const section = printNode("section", "print-entry");
+        const bar = printNode("div", "print-entry-heading");
+        bar.append(
+          printNode("span", "", (i + 1) + ". " + expense.category),
+          printNode("strong", "", formatMoney(expense.amount))
+        );
+        section.appendChild(bar);
+        if (expense.remark) section.appendChild(printNode("p", "print-remark", expense.remark));
+        printDocument.appendChild(section);
+
+        const files = Array.isArray(expense.files) ? expense.files : [];
+        for (const [idx, file] of files.entries()) {
+          previewStatus.textContent = `正在处理照片 ${++done} / ${fileCount} ...`;
+          // 每张照片独立一块，浏览器可以在照片之间自然分页。
+          let dataUrl;
+          try {
+            dataUrl = await imageToPrintDataUrl(file);
+          } catch (error) {
+            const name = file && file.name ? file.name : `第 ${idx + 1} 张图片`;
+            throw new Error(`「${name}」转换失败：${error.message}`);
+          }
+          const figure = printNode("figure", "print-photo");
+          const img = document.createElement("img");
+          img.alt = `${expense.category} - 凭证 ${idx + 1}`;
+          img.src = dataUrl;
+          figure.append(img, printNode("figcaption", "", `${i + 1}. ${expense.category} — 凭证 ${idx + 1}`));
+          section.appendChild(figure);
+          if (img.decode) await img.decode();
+        }
+      }
+    }
+
+    generatePdfBtn.addEventListener("click", async () => {
       if (isClearing || expenses.length === 0) return;
-      window.print();
+      exportPreview.hidden = false;
+      document.documentElement.classList.add("preview-open");
+      exportPreview.scrollTop = 0;
+      previewStatus.textContent = "正在准备 A4 报账单...";
+      confirmPrintBtn.disabled = true;
+      closePreviewBtn.disabled = true;
+      try {
+        await buildPrintDocument();
+        previewStatus.textContent = "预览已完成。请先确认所有照片显示正常，再点「打印 / 保存 PDF」。";
+        confirmPrintBtn.disabled = false;
+      } catch (error) {
+        console.error("准备 PDF 失败：", error);
+        previewStatus.textContent = "无法生成完整报账单：" + error.message;
+        previewStatus.classList.add("text-danger");
+        // 有照片失败时禁止导出，避免用户不知情地得到缺少凭证的 PDF。
+        confirmPrintBtn.disabled = true;
+      } finally {
+        closePreviewBtn.disabled = false;
+      }
+    });
+
+    confirmPrintBtn.addEventListener("click", () => {
+      if (!confirmPrintBtn.disabled) window.print();
+    });
+
+    closePreviewBtn.addEventListener("click", () => {
+      exportPreview.hidden = true;
+      document.documentElement.classList.remove("preview-open");
+      previewStatus.classList.remove("text-danger");
+      printDocument.replaceChildren();
     });
 
     // 清空所有已添加记录及其照片，并同步清除 IndexedDB 当前草稿。
