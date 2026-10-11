@@ -166,7 +166,7 @@
             <div class="row g-2 mt-3">
               <div class="col-12 col-sm-6">
                 <button id="generatePdfBtn" type="button" class="btn btn-success btn-lg w-100" disabled>生成 PDF</button>
-                <small class="text-muted">⬆先预览 A4 报账单（包含图片），再选择打印或保存为 PDF。</small>
+                <small class="text-muted">⬆生成真正的 PDF 文件，包含全部金额、备注和凭证图片。</small>
               </div>
               <div class="col-12 col-sm-6">
                 <button id="clearBtn" type="button" class="btn btn-outline-danger btn-lg w-100" disabled>清空报账单</button>
@@ -183,15 +183,16 @@
   <!-- PDF 专用预览：不使用页面右侧的缩略图，不依赖临时 blob: 图片地址。 -->
   <div id="exportPreview" class="export-overlay" hidden role="dialog" aria-modal="true" aria-label="报账单 PDF 预览">
     <div class="export-toolbar">
-      <div class="fw-bold mb-1">报账单 PDF 预览</div>
-      <div id="previewStatus" class="small text-secondary mb-2" role="status" aria-live="polite">正在准备图片...</div>
+      <div class="fw-bold mb-1">生成并保存报账单 PDF</div>
+      <div id="previewStatus" class="small text-secondary mb-2" role="status" aria-live="polite">正在准备文件...</div>
       <div class="d-flex flex-wrap gap-2">
-        <button id="confirmPrintBtn" class="btn btn-success" type="button" disabled>打印 / 保存 PDF</button>
+        <button id="confirmPrintBtn" class="btn btn-success" type="button" disabled>保存 / 分享 PDF</button>
+        <a id="openPdfLink" class="btn btn-outline-primary d-none" target="_blank" rel="noopener noreferrer">打开 PDF 查看</a>
         <button id="closePreviewBtn" class="btn btn-outline-secondary" type="button">返回编辑</button>
       </div>
-      <div class="small text-secondary mt-2">iPhone：点击打印后，在系统预览中分享并存储到「文件」。请先确认下面能看到所有照片。</div>
+      <div class="small text-secondary mt-2">iPhone：点「保存 / 分享 PDF」，在系统共享菜单中选「存储到文件」。如果没有弹出共享菜单，可点「打开 PDF 查看」。</div>
     </div>
-    <div class="print-sheet"><div id="printDocument" class="print-document"></div></div>
+    <div class="print-sheet" style="min-height: 100px;"><div id="printDocument" class="print-document"></div></div>
   </div>
 
   <script>
@@ -214,6 +215,9 @@
     const printDocument = document.getElementById("printDocument");
     const confirmPrintBtn = document.getElementById("confirmPrintBtn");
     const closePreviewBtn = document.getElementById("closePreviewBtn");
+    const openPdfLink = document.getElementById("openPdfLink");
+    let readyPdfUrl = null;
+    let readyPdfFile = null;
     let isClearing = false;
     // 将 IndexedDB 写操作按先后顺序排队，防止“添加后立即清空”时旧草稿再次写回。
     let lastDraftWrite = Promise.resolve();
@@ -647,39 +651,293 @@
       }
     }
 
-    generatePdfBtn.addEventListener("click", async () => {
-      if (isClearing || expenses.length === 0) return;
-      exportPreview.hidden = false;
-      document.documentElement.classList.add("preview-open");
-      exportPreview.scrollTop = 0;
-      previewStatus.textContent = "正在准备 A4 报账单...";
-      confirmPrintBtn.disabled = true;
-      closePreviewBtn.disabled = true;
-      try {
-        await buildPrintDocument();
-        previewStatus.textContent = "预览已完成。请先确认所有照片显示正常，再点「打印 / 保存 PDF」。";
-        confirmPrintBtn.disabled = false;
-      } catch (error) {
-        console.error("准备 PDF 失败：", error);
-        previewStatus.textContent = "无法生成完整报账单：" + error.message;
-        previewStatus.classList.add("text-danger");
-        // 有照片失败时禁止导出，避免用户不知情地得到缺少凭证的 PDF。
-        confirmPrintBtn.disabled = true;
-      } finally {
-        closePreviewBtn.disabled = false;
+
+// 直接生成 A4 PDF：每一页用一张 JPEG，不依赖外部 PDF/打印库。
+function assemblePdf(jpegPages, pageWidth, pageHeight, pixelWidth, pixelHeight) {
+  const encoder = new TextEncoder();
+  const chunks = [];
+  let count = 0;
+  const offsets = [];
+  const add = v => {
+    const b = typeof v === "string" ? encoder.encode(v) : v;
+    chunks.push(b);
+    count += b.length;
+  };
+  const begin = id => { offsets[id] = count; add(`${id} 0 obj\n`); };
+  const end = () => add("endobj\n");
+  const ids = jpegPages.map((_, i) => 3 + i * 3);
+  add("%PDF-1.4\n%generated-by-financial-report\n");
+  begin(1); add("<< /Type /Catalog /Pages 2 0 R >>\n"); end();
+  begin(2); add(`<< /Type /Pages /Count ${jpegPages.length} /Kids [${ids.map(id => `${id} 0 R`).join(" ")}] >>\n`); end();
+  for (let i = 0; i < jpegPages.length; i++) {
+    const pageId = ids[i], contentId = pageId + 1, imageId = pageId + 2;
+    begin(pageId);
+    add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im1 ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>\n`);
+    end();
+    const commands = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Im1 Do\nQ\n`;
+    begin(contentId);
+    add(`<< /Length ${encoder.encode(commands).length} >>\nstream\n`);
+    add(commands);
+    add("endstream\n");
+    end();
+    const jpeg = jpegPages[i];
+    begin(imageId);
+    add(`<< /Type /XObject /Subtype /Image /Width ${pixelWidth} /Height ${pixelHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
+    add(jpeg);
+    add("\nendstream\n");
+    end();
+  }
+  const xrefAt = count;
+  const n = 2 + jpegPages.length * 3;
+  add(`xref\n0 ${n + 1}\n0000000000 65535 f \n`);
+  for (let id = 1; id <= n; id++) add(`${String(offsets[id]).padStart(10, "0")} 00000 n \n`);
+  add(`trailer\n<< /Size ${n + 1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`);
+  const bytes = new Uint8Array(count);
+  let pos = 0;
+  for (const chunk of chunks) { bytes.set(chunk, pos); pos += chunk.length; }
+  return bytes;
+}
+
+async function createDirectPdf() {
+  const jpegPages = [];
+  const PW = 595.28, PH = 841.89, scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(PW * scale);
+  canvas.height = Math.ceil(PH * scale);
+  const ctx = canvas.getContext("2d", {alpha: false});
+  if (!ctx) throw new Error("无法创建 PDF 画布，可能是设备内存不足");
+  ctx.scale(scale, scale);
+  const left = 43, right = PW - 43, bottom = PH - 44;
+  let y = 45;
+  let pageCount = 0;
+
+  function textStyle(size = 11, bold = false, color = "#263241") {
+    ctx.font = `${bold ? "bold " : ""}${size}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
+    ctx.fillStyle = color;
+  }
+  function newCanvasPage() {
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, PW, PH);
+    y = 48;
+  }
+  async function finishPage() {
+    const jpg = canvas.toDataURL("image/jpeg", 0.89);
+    const binary = atob(jpg.substring(jpg.indexOf(",") + 1));
+    const imageBytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) imageBytes[i] = binary.charCodeAt(i);
+    jpegPages.push(imageBytes);
+    ++pageCount;
+  }
+  async function nextPage() {
+    await finishPage();
+    newCanvasPage();
+  }
+  function line(text, x, atY, size = 11, bold = false, color = "#263241") {
+    textStyle(size,bold,color);
+    ctx.fillText(String(text), x, atY);
+  }
+  function rightLine(text, atY, size = 11, bold = false) {
+    textStyle(size,bold);
+    ctx.textAlign = "right";
+    ctx.fillText(String(text), right, atY);
+    ctx.textAlign = "left";
+  }
+  function truncateTo(text, maxWidth) {
+    let t = String(text);
+    if (ctx.measureText(t).width <= maxWidth) return t;
+    while (t.length && ctx.measureText(t + "…").width > maxWidth) t = t.slice(0, -1);
+    return t + "…";
+  }
+  function wrapLines(value, maxWidth) {
+    const result = [];
+    for (const paragraph of String(value || "").split(/\r?\n/)) {
+      if (paragraph === "") { result.push(""); continue; }
+      let current = "";
+      for (const char of paragraph) {
+        if (current && ctx.measureText(current + char).width > maxWidth) {
+          result.push(current);
+          current = char;
+        } else current += char;
+      }
+      if (current) result.push(current);
+    }
+    return result;
+  }
+  async function ensureRoom(height) {
+    if (y + height > bottom) await nextPage();
+  }
+  async function drawWrapped(value, x, maxWidth, size=11, height=17) {
+    textStyle(size);
+    const rows = wrapLines(value, maxWidth);
+    for (const row of rows) {
+      await ensureRoom(height + 3);
+      line(row, x, y + size, size);
+      y += height;
+    }
+  }
+  function rule() {
+    ctx.strokeStyle = "#d7e0ea";
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+  }
+  async function readImage(file) {
+    if (!(file instanceof Blob)) throw new Error("草稿图片数据格式无效");
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error("无法读取图片格式：" + (file.name || "未知图片")));
+        img.src = url;
+      });
+      return img;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  newCanvasPage();
+  textStyle(21, true);
+  ctx.textAlign = "center";
+  ctx.fillText("崔莹报账单", PW / 2, y + 16);
+  ctx.textAlign = "left";
+  y += 34;
+  rightLine("生成日期：" + new Date().toLocaleDateString("zh-CN"), y + 4, 10);
+  y += 22;
+  rule();
+  y += 24;
+  line("费用汇总", left, y, 15, true);
+  y += 13;
+  ctx.fillStyle = "#eef3f8";
+  ctx.fillRect(left, y, right - left, 29);
+  line("序号", left + 9, y + 19, 11, true);
+  line("报账类别", left + 62, y + 19, 11, true);
+  rightLine("金额（人民币）", y + 19, 11, true);
+  y += 29;
+  rule();
+  let totalCents = 0;
+  for (let index = 0; index < expenses.length; index++) {
+    await ensureRoom(32);
+    const record = expenses[index];
+    totalCents += Math.round(Number(record.amount) * 100);
+    line(index + 1, left + 12, y + 20, 10);
+    textStyle(10.5);
+    line(truncateTo(record.category, 290), left + 62, y + 20, 10.5);
+    rightLine(formatMoney(record.amount), y + 20, 11, true);
+    y += 32;
+    rule();
+  }
+  await ensureRoom(39);
+  y += 7;
+  line("总金额", left + 7, y + 18, 12, true);
+  rightLine(formatMoney(totalCents / 100), y + 18, 14, true);
+  y += 47;
+  await ensureRoom(55);
+  line("明细及凭证", left, y + 3, 15, true);
+  y += 27;
+  rule();
+  y += 15;
+
+  for (const [index, record] of expenses.entries()) {
+    await ensureRoom(55);
+    ctx.fillStyle = "#eef3f8";
+    ctx.fillRect(left, y, right - left, 29);
+    line(`${index + 1}. ${record.category}`, left + 9, y + 19, 11, true);
+    rightLine(formatMoney(record.amount), y + 19, 11, true);
+    y += 40;
+    if (record.remark) {
+      await drawWrapped("备注：" + record.remark, left + 8, right - left - 17, 11, 19);
+      y += 7;
+    }
+    const files = Array.isArray(record.files) ? record.files : [];
+    for (const [idx, file] of files.entries()) {
+      previewStatus.textContent = `正在生成 PDF：处理第 ${index + 1} 条的第 ${idx + 1} 张照片…`;
+      const img = await readImage(file);
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      if (!iw || !ih) throw new Error("无法读取照片尺寸");
+      const ratio = Math.min(1, 488 / iw, 520 / ih);
+      const w = iw * ratio, h = ih * ratio;
+      await ensureRoom(Math.min(h + 35, bottom - 50));
+      // 若一页空间不够，在下一页放完整照片，绝不截断图片。
+      if (y + h + 27 > bottom) await nextPage();
+      line(`凭证 ${idx + 1}`, left + 8, y + 11, 10);
+      y += 18;
+      try { ctx.drawImage(img, left + (right - left - w) / 2, y, w, h); }
+      catch { throw new Error("照片无法绘制，请尝试转换为 JPG/PNG"); }
+      y += h + 18;
+    }
+    y += 8;
+  }
+  await finishPage();
+  canvas.width = canvas.height = 0;
+  const pdfBytes = assemblePdf(jpegPages, PW, PH, Math.ceil(PW * scale), Math.ceil(PH * scale));
+  return {bytes: pdfBytes, pages: pageCount};
+}
+
+// 第一阶段生成 PDF，第二次点击分享/下载。第二次点击保持“用户手势”，
+// iPhone 才能可靠打开系统分享面板。
+generatePdfBtn.addEventListener("click", async () => {
+  if (isClearing || expenses.length === 0) return;
+  exportPreview.hidden = false;
+  document.documentElement.classList.add("preview-open");
+  exportPreview.scrollTop = 0;
+  previewStatus.classList.remove("text-danger");
+  previewStatus.textContent = "正在生成 PDF，请勿关闭这个页面…";
+  printDocument.replaceChildren();
+  confirmPrintBtn.disabled = true;
+  closePreviewBtn.disabled = true;
+  openPdfLink.classList.add("d-none");
+  try {
+    const {bytes, pages} = await createDirectPdf();
+    if (readyPdfUrl) URL.revokeObjectURL(readyPdfUrl);
+    const blob = new Blob([bytes], {type: "application/pdf"});
+    readyPdfUrl = URL.createObjectURL(blob);
+    readyPdfFile = new File([blob], "崔莹报账单.pdf", {type: "application/pdf"});
+    openPdfLink.href = readyPdfUrl;
+    openPdfLink.classList.remove("d-none");
+    confirmPrintBtn.disabled = false;
+    previewStatus.textContent = `PDF 已成功生成（共 ${pages} 页），请点击「保存 / 分享 PDF」。`;
+    printDocument.appendChild(printNode("p", "mt-4 text-center", `已生成 ${expenses.length} 条报账记录，合计 ${formatMoney(expenses.reduce((t,e)=>t+Math.round(Number(e.amount)*100),0)/100)}。`));
+  } catch (error) {
+    console.error("生成 PDF 失败：", error);
+    previewStatus.textContent = "PDF 生成失败：" + (error.message || String(error));
+    previewStatus.classList.add("text-danger");
+  } finally {
+    closePreviewBtn.disabled = false;
+  }
+});
+
+confirmPrintBtn.addEventListener("click", () => {
+  if (confirmPrintBtn.disabled || !readyPdfUrl || !readyPdfFile) return;
+  const data = {files: [readyPdfFile], title: "崔莹报账单"};
+  if (navigator.share && navigator.canShare && navigator.canShare({files: data.files})) {
+    // 直接在点击事件中调用，不先 await 任何异步任务。
+    navigator.share(data).catch(error => {
+      if (error.name !== "AbortError") {
+        previewStatus.textContent = "分享未打开：可点击旁边的「打开 PDF 查看」，再从浏览器保存。";
       }
     });
+  } else {
+    const a = document.createElement("a");
+    a.href = readyPdfUrl;
+    a.download = readyPdfFile.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    previewStatus.textContent = "已发起 PDF 下载。如果手机没有下载提示，可点击「打开 PDF 查看」。";
+  }
+});
 
-    confirmPrintBtn.addEventListener("click", () => {
-      if (!confirmPrintBtn.disabled) window.print();
-    });
-
-    closePreviewBtn.addEventListener("click", () => {
-      exportPreview.hidden = true;
-      document.documentElement.classList.remove("preview-open");
-      previewStatus.classList.remove("text-danger");
-      printDocument.replaceChildren();
-    });
+closePreviewBtn.addEventListener("click", () => {
+  exportPreview.hidden = true;
+  document.documentElement.classList.remove("preview-open");
+  previewStatus.classList.remove("text-danger");
+  printDocument.replaceChildren();
+  // PDF 的 blob URL 保留到下次生成，避免下载/查看尚未完成时被释放。
+});
 
     // 清空所有已添加记录及其照片，并同步清除 IndexedDB 当前草稿。
     clearBtn.addEventListener("click", async () => {
